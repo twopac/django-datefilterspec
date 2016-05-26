@@ -155,7 +155,7 @@ class DateRangeFilter(admin.filters.FieldListFilter):
         Pop the original parameters, and return the date filter & other filter
         parameters.
         """
-        
+
         cl.params.pop(self.lookup_kwarg_since, None)
         cl.params.pop(self.lookup_kwarg_upto, None)
         return ({
@@ -189,11 +189,8 @@ class DateTimeRangeFilter(admin.filters.FieldListFilter):
     template = 'daterange_filter/filter.html'
 
     def __init__(self, field, request, params, model, model_admin, field_path):
-        self.lookup_kwarg_since_0 = '%s%s__gte_0' % (FILTER_PREFIX, field_path)
-        self.lookup_kwarg_since_1 = '%s%s__gte_1' % (FILTER_PREFIX, field_path)
-        self.lookup_kwarg_upto_0 = '%s%s__lte_0' % (FILTER_PREFIX, field_path)
-        self.lookup_kwarg_upto_1 = '%s%s__lte_1' % (FILTER_PREFIX, field_path)
-
+        self.lookup_kwarg_since = '%s%s__gte' % (FILTER_PREFIX, field_path)
+        self.lookup_kwarg_upto = '%s%s__lte' % (FILTER_PREFIX, field_path)
         super(DateTimeRangeFilter, self).__init__(
             field, request, params, model, model_admin, field_path)
         self.form = self.get_form(request)
@@ -202,15 +199,21 @@ class DateTimeRangeFilter(admin.filters.FieldListFilter):
         return []
 
     def expected_parameters(self):
-        return [self.lookup_kwarg_since_0, self.lookup_kwarg_since_1, self.lookup_kwarg_upto_0, self.lookup_kwarg_upto_1]
+        return [self.lookup_kwarg_since, self.lookup_kwarg_upto]
 
     def get_form(self, request):
-        return DateTimeRangeForm(request, data=self.used_parameters, field_name=self.field_path)
+        return DateRangeForm(request, data=self.used_parameters,
+                             field_name=self.field_path)
 
     def queryset(self, request, queryset):
         if self.form.is_valid():
             # get no null params
             filter_params = clean_input_prefix(dict(filter(lambda x: bool(x[1]), self.form.cleaned_data.items())))
+            for param in filter_params.keys():
+                if param.endswith('gte'):
+                    filter_params[param] = datetime.datetime.combine(filter_params[param], datetime.time.min)
+                else:
+                    filter_params[param] = datetime.datetime.combine(filter_params[param], datetime.time.max)
             return queryset.filter(**filter_params)
         else:
             return queryset
